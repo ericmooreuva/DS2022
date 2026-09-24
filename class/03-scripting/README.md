@@ -6,8 +6,7 @@ This module covers Bash and Python scripting. In the lab you will be using the [
 
 - [Setup](#setup)
 - [Managing Python environments with uv](#managing-python-environments-with-uv)
-- [Scripting best practices](#scripting-best-practices)
-- [Start Lab 03](https://github.com/ksiller/lab-03-scripting)
+- [Start Lab 03](https://github.com/ksiller/lab-03-scripting), use [Scripting best practices](#scripting-best-practices) as a reference as needed.
 
 > **Note:** Use [Scripting best practices](#scripting-best-practices) as a reference while you work through Lab 03.
 
@@ -72,7 +71,7 @@ The conflict is caused by:
 
 Neither package lists the other as a dependency. Both need `protobuf`, but one requires version 4.x and the other requires 6.x — no single version can satisfy both. The clean solution is **separate environments**: one project gets `dbt-core`, another gets `google-cloud-pubsub`. `uv` creates and manages those environments for you.
 
-### Core ideas
+### uv Core ideas
 
 
 | Piece             | Role                                                                               |
@@ -81,11 +80,12 @@ Neither package lists the other as a dependency. Both need `protobuf`, but one r
 | `pyproject.toml`  | Declares your project and its dependencies (what you want).                        |
 | `uv.lock`         | Pins the exact versions `uv` resolved (what you got). Makes installs reproducible. |
 | `.python-version` | Records which Python version this project expects.                                 |
+| `.git/` / `.gitignore` | Local Git repo for version control and ignore rules (`uv init` creates both by default). |
 
 
 Typical workflow:
 
-1. Edit dependencies with `uv add` / `uv rm`.
+1. Edit dependencies with `uv add` / `uv remove`.
 2. That updates `pyproject.toml` and `uv.lock`.
 3. Run `uv sync` to (re)create or update `.venv`.
 4. Run code with `uv run`.
@@ -99,7 +99,7 @@ Create a practice folder and a first project inside it:
 ```bash
 mkdir -p ~/ds2022-fall-26/uv-practice
 cd ~/ds2022-fall-26/uv-practice
-uv init project-1 --name project-1 --description "Practice project for uv"
+uv init project-1 --python 3.11 --name project-1 --description "Practice project for uv"
 cd project-1
 ```
 
@@ -109,11 +109,30 @@ cd project-1
 
 ```bash
 ls -la
+```
+
+Right after `uv init` (still inside `project-1`), you should see something like:
+
+```text
+.
+|-- .git/
+|-- .gitignore
+|-- .python-version
+|-- README.md
+|-- pyproject.toml
+`-- src/
+    `-- project_1/      # package name (hyphens become underscores)
+        `-- __init__.py
+```
+
+There is **no** `uv.lock` or `.venv/` yet — those appear after the first `uv add` (or `uv sync`). Your Python code goes in `src/project_1/`. Keep `__init__.py`; it lets you import the project as a bona fide package.
+
+```bash
 cat pyproject.toml
 cat .python-version
 ```
 
-You should see `pyproject.toml`, `.python-version`, and usually a small starter layout. Open `pyproject.toml` and notice that `dependencies` starts empty.
+Open `pyproject.toml` and notice that `dependencies` starts empty.
 
 #### 2. `uv add`
 
@@ -139,6 +158,7 @@ uv tree
 ```
 
 This shows the hierarchy of package dependencies in your current project.
+
 #### 3. `uv run`
 
 Run Python **through** the project environment (no need to `source .venv/bin/activate` first):
@@ -155,10 +175,10 @@ uv run python
 
 
 
-#### 4. `uv rm`
+#### 4. `uv remove`
 
 ```bash
-uv rm requests
+uv remove requests
 uv run python -c "import requests"
 ```
 
@@ -189,25 +209,6 @@ On a fresh machine (or HPC), you typically clone the repo, then run `uv sync` or
 
 Both belong in Git. Together they let someone else recreate the same environment with `uv sync`.
 
-### Using a `requirements.txt` with `uv`
-
-Many community Python projects still ship a `requirements.txt`. That older format lists needed packages one per line. You can import it into a `uv` project:
-
-```bash
-echo "requests>=2.31.0" > requirements.txt
-uv add -r requirements.txt
-```
-
-That adds those packages to `pyproject.toml` / `uv.lock`. You may keep `requirements.txt` for documentation, but for a `uv` project the source of truth is `pyproject.toml` + `uv.lock`.
-
-If another tool only knows how to install from a `requirements.txt` (and not from `uv.lock`), you can ask `uv` to write one that lists the exact versions currently locked for this project:
-
-```bash
-uv export -o requirements-locked.txt
-```
-
-You do **not** need this for Lab 03. The lab (and this course) treat `pyproject.toml` + `uv.lock` as enough: someone else runs `uv sync` or `uv run` and gets the same environment. Use `uv export` only when you must hand a classic `requirements.txt` to a system that cannot use `uv`.
-
 ### Setting up separate projects
 
 The conflict example earlier showed that `dbt-core==1.7.14` and `google-cloud-pubsub==2.40.0` cannot be installed in one environment. Put each in its own project instead.
@@ -229,21 +230,35 @@ cd project-2
 uv add google-cloud-pubsub==2.40.0
 ```
 
-Typical layout:
+Typical layout (after `uv init` + `uv add`; current `uv` puts package code under `src/`):
 
 ```text
 ~/ds2022-fall-26/uv-practice/
 |-- project-1/
-|   |-- pyproject.toml      # includes dbt-core==1.7.14
+|   |-- pyproject.toml      # includes dbt-core==1.7.14 (and earlier requests)
 |   |-- uv.lock
+|   |-- README.md
+|   |-- .git/
+|   |-- .gitignore
 |   |-- .python-version
+|   |-- src/
+|   |   `-- project_1/      # name of your package
+|   |       `-- __init__.py
 |   `-- .venv/
 `-- project-2/
     |-- pyproject.toml      # includes google-cloud-pubsub==2.40.0
     |-- uv.lock
+    |-- README.md
+    |-- .git/
+    |-- .gitignore
     |-- .python-version
+    |-- src/
+    |   `-- project_2/      # name of your package
+    |       `-- __init__.py
     `-- .venv/
+
 ```
+**Your Python code should go in the `src/<your_package>` directories.**
 
 In `project-2`, Pub/Sub imports work; `dbt` does not (it was never installed here):
 
@@ -262,21 +277,11 @@ uv run python -c "from google.cloud import pubsub_v1"
 
 Each project has its own `.venv`, so the packages no longer fight over `protobuf`.
 
-### Advanced: try a package once with `uv run --with`
-
-**Intention:** run a command that needs an extra package **today**, without making that package a permanent dependency of the project.
-
-`uv add` updates `pyproject.toml` and `uv.lock` and installs into `.venv`. That is what you want for libraries your project actually relies on. `--with` is for a temporary tryout: “borrow” a package for this one command only.
-
-```bash
-uv run --with rich python -c "from rich import print; print('[bold green]hello[/]')"
-```
-
-For that command, `uv` makes `rich` available so the import works. It does **not** add `rich` to `pyproject.toml` or `uv.lock`. The next plain `uv run python ...` will not have `rich` unless you `uv add rich`.
-
-Use `--with` for quick experiments. If you will keep using the package in this project, `uv add` it instead.
-
 ### Version control
+
+Use Git to share the project definition (`pyproject.toml`, `uv.lock`, `.python-version`), not the installed packages in `.venv/`.
+
+#### Best practices
 
 **Commit:**
 
@@ -291,16 +296,85 @@ Use `--with` for quick experiments. If you will keep using the package in this p
 
 **Do not hand-edit:**
 
-- `uv.lock` (let `uv add`, `uv rm`, and `uv sync` maintain it)
-- Prefer changing dependencies with `uv add` / `uv rm` instead of hand-editing `pyproject.toml` dependency lists (avoids lockfile drift)
+- `uv.lock` (let `uv add`, `uv remove`, and `uv sync` maintain it)
+- Prefer changing dependencies with `uv add` / `uv remove` instead of hand-editing `pyproject.toml` dependency lists (avoids lockfile drift)
 
-Quick `.gitignore` line (run in each project directory):
+Before you commit, make sure `.venv` is listed in `.gitignore`. Current `uv init` already adds a `.venv` line; this only appends one if it is missing:
 
 ```bash
-echo ".venv/" >> .gitignore
+grep -qE '^\.venv/?$' .gitignore 2>/dev/null || echo ".venv/" >> .gitignore
 ```
 
+#### Connecting a local project to GitHub
 
+`uv init` already created a local Git repository in `project-1`. Publish it to GitHub so you can push `pyproject.toml`, `uv.lock`, and `.python-version` (and pull the project elsewhere later).
+
+1. On GitHub, create a **new empty repository** (for example `project-1`). Do **not** add a README, `.gitignore`, or license; your laptop already has the first commit history from `uv init`.
+2. Copy the HTTPS URL GitHub shows (it looks like `https://github.com/YOUR_USERNAME/project-1.git`).
+3. In the terminal, from `project-1`, point `origin` at that URL and confirm:
+
+```bash
+cd ~/ds2022-fall-26/uv-practice/project-1
+git remote add origin https://github.com/YOUR_USERNAME/project-1.git
+git remote -v
+```
+
+You should see:
+
+```text
+origin    https://github.com/YOUR_USERNAME/project-1.git (fetch)
+origin    https://github.com/YOUR_USERNAME/project-1.git (push)
+```
+
+4. Stage the project files, commit, and push. Use the branch name Git shows (`main` is typical after `uv init`):
+
+```bash
+git status
+git add -A
+git status
+git commit -m "Commit with package requirements"
+git branch -M main
+git push -u origin main
+```
+
+`git add -A` stages all new and changed project files, but skips `.venv/` if it is listed in `.gitignore` (see Best practices above). Refresh the repository page on GitHub to confirm the files are there.
+
+Do **not** commit `.venv/`. Someone else (or you on another machine) should recreate it with `uv sync` or `uv run`.
+
+### Advanced topics
+
+#### Try a package once with `uv run --with`
+
+**Intention:** run a command that needs an extra package **today**, without making that package a permanent dependency of the project.
+
+`uv add` updates `pyproject.toml` and `uv.lock` and installs into `.venv`. That is what you want for libraries your project actually relies on. `--with` is for a temporary tryout: “borrow” a package for this one command only.
+
+```bash
+uv run --with rich python -c "from rich import print; print('[bold green]hello[/]')"
+```
+
+For that command, `uv` makes `rich` available so the import works. It does **not** add `rich` to `pyproject.toml` or `uv.lock`. The next plain `uv run python ...` will not have `rich` unless you `uv add rich`.
+
+Use `--with` for quick experiments. If you will keep using the package in this project, `uv add` it instead.
+
+#### Using a `requirements.txt` with `uv`
+
+Many community Python projects still ship a `requirements.txt`. That older format lists needed packages one per line. You can import it into a `uv` project:
+
+```bash
+echo "requests>=2.31.0" > requirements.txt
+uv add -r requirements.txt
+```
+
+That adds those packages to `pyproject.toml` / `uv.lock`. You may keep `requirements.txt` for documentation, but for a `uv` project the source of truth is `pyproject.toml` + `uv.lock`.
+
+If another tool only knows how to install from a `requirements.txt` (and not from `uv.lock`), you can ask `uv` to write one that lists the exact versions currently locked for this project:
+
+```bash
+uv export -o requirements-locked.txt
+```
+
+You do **not** need this for Lab 03. The lab (and this course) treat `pyproject.toml` + `uv.lock` as enough: someone else runs `uv sync` or `uv run` and gets the same environment. Use `uv export` only when you must hand a classic `requirements.txt` to a system that cannot use `uv`.
 
 ## Scripting Best Practices
 
@@ -538,5 +612,4 @@ Scripting in Python is similar in spirit to bash, but Python offers more built-i
 - [Bash Scripting Tutorial (video)](https://www.youtube.com/watch?v=tK9Oc6AEnR4)
 - [Bash Guide for Beginners (TLDP)](https://tldp.org/LDP/Bash-Beginners-Guide/html/)
 - [uv documentation](https://docs.astral.sh/uv/)
-- [Lab 03: Scripting](https://github.com/ksiller/lab-03-scripting)
 

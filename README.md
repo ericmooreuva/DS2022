@@ -97,12 +97,11 @@ git commit -m "Save my local work"
 
 If the working tree is clean, skip the commit.
 
-2. Update `main` from the course repository:
+2. Update `main` from the course repository (from upstream):
 
 ```bash
 git switch main
-git fetch upstream
-git merge upstream/main
+git pull upstream main --no-rebase
 ```
 
 3. (Optional) Update your fork on GitHub so it matches what you just synced:
