@@ -1,5 +1,9 @@
 # AWS S3 Storage
 
+> [!CAUTION]
+> **Do NOT click Reset in the AWS Academy Learner Lab unless your instructor tells you to.**
+> Reset permanently deletes everything in your lab account (S3 buckets, EC2 instances, Lambda functions, ...) and cannot be undone. To pause, click **End Lab**: your resources stay and are back with the next **Start Lab**.
+
 This session focuses on **S3**, object storage for datasets, backups, and pipeline I/O. Building on [IAM](../06-iam/README.md), you will:
 
 - start an AWS Academy **Learner Lab** and inspect its pre-created IAM roles
@@ -67,27 +71,6 @@ Work in the **AWS Academy Learner Lab** (same Academy course as [IAM](../06-iam/
 
 > **Do not click Reset.** A Learner Lab session lasts about 4 hours; when the timer runs out (or you click **End Lab**) the session stops, EC2 instances are stopped, and your credentials expire. Your S3 buckets and other resources stay in the account and are there again the next time you click **Start Lab**. **Reset** deletes everything in the lab account. You will reuse this setup later (EC2, serverless).
 
-
-
-### IAM in the Learner Lab (inspect, don't create)
-
-The Learner Lab account has very limited IAM access. You cannot create IAM users or groups, and you cannot create your own roles (AWS services may still create service-linked roles for you). You don't need to: you sign in through a pre-created role named `voclabs`, and Academy's policy on that role already allows S3, EC2, RDS, Lambda, and the other services used in this course (within lab limits such as region and instance size).
-
-Look at your identity instead (this reinforces [IAM](../06-iam/README.md)):
-
-1. Open **IAM** → **Roles**. You will see `voclabs` (the role you are signed in with right now) and `LabRole`. Academy hides the details of `voclabs`, so you can't open it.
-2. Open `LabRole` and look at the **Permissions** tab. You will see two kinds of policies:
-  - **AWS managed** policies (EC2, EKS, SSM) that you can open and read.
-  - Three **inline** policies with generated names ending in `VocLabPolicy1`, `VocLabPolicy2`, `VocLabPolicy3`. Academy hides their contents. According to the AWS Academy Learner Lab service guide, `LabRole` "has permissions very similar to the permissions you have as a user in the console". Code running under `LabRole` can generally reach the same services you use in the lab console, including S3, Lambda, DynamoDB, RDS, and CloudWatch, which you will use in the coming weeks.
-3. Open the **Trust relationships** tab. Which services can assume `LabRole`?
-
-`LabRole` **for EC2 and Lambda (do not skip):** Academy pre-creates a role named `LabRole` and an instance profile named `LabInstanceProfile`. When you launch EC2 or create Lambda later, attach these; you cannot create new roles in the Learner Lab.
-
-- **EC2:** assign instance profile `LabInstanceProfile` (so the instance uses `LabRole`). Needed for browser/SSM access and for apps on the instance to call other AWS services.
-- **Lambda:** set the function's execution role to `LabRole` so the function can reach S3, CloudWatch, and other services.
-
-For the CLI exercises below, use the **AWS Details** session credentials (Access Key + Secret + Session Token). They belong to your `voclabs` session; there are no long-lived access keys in the Learner Lab.
-
 ### AWS CLI configuration (temporary credentials)
 
 The CLI credentials are not in the AWS Console. They are on the Learner Lab page where you clicked **Start Lab**:
@@ -101,13 +84,13 @@ Create the credentials file and open it in Cursor:
 
 ```bash
 mkdir -p ~/.aws
-touch ~/.aws/credentials
+touch ~/.aws/credentials # creates empty ~/.aws/credentials
 cursor ~/.aws/credentials
 ```
 
-If the shell reports `cursor: command not found`, open the file from Cursor instead: **File** → **Open File...**, press `Cmd+Shift+.` (Mac) to show hidden folders, and go to `.aws/credentials` in your home folder.
+If the shell reports `cursor: command not found`, open the file from Cursor instead: **File** → **Open File...**, press `Cmd+Shift+.` (Mac) to show hidden folders, and go to `.aws/credentials` in your home folder. Alternatively, you can use other text editors like nano or vi.
 
-Paste the whole block into the file, replacing anything already in it, and save. It should look like this, with each value on a single line (the session token is very long):
+Paste the whole block into the credentials file, replacing anything already in it, and save. It should look like this, with each value on a single line (the session token is very long):
 
 ```text
 [default]
@@ -124,14 +107,6 @@ aws configure set output json
 ```
 
 > **Credentials expire when the lab session ends (about 4 hours).** When `aws` or `boto3` suddenly fail with expired-token errors, click **Start Lab** again if the session has ended, open **AWS Details** → **AWS CLI** → **Show**, copy the new block, and replace the contents of `~/.aws/credentials` with it. The region in `~/.aws/config` stays. Refreshing credentials does not affect your buckets.
-
-Alternatively, export the values in the shell (include the session token):
-
-```bash
-export AWS_ACCESS_KEY_ID="YOUR_ACCESS_KEY"
-export AWS_SECRET_ACCESS_KEY="YOUR_SECRET_KEY"
-export AWS_SESSION_TOKEN="YOUR_SESSION_TOKEN"
-```
 
 Upon completion you will have `~/.aws/config` (region and output format) and `~/.aws/credentials` (the three values from AWS Details).
 
@@ -240,8 +215,12 @@ Notice that we don't have to create the `new_folder`.
 
 In the example below, replace `practice-mst3k` with your actual bucket name.
 
-```
+```bash
 aws s3 ls s3://practice-mst3k/
+```
+
+Output may look like this:
+```text
                            PRE folder/
                            PRE new_folder/
 ```
